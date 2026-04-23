@@ -1,0 +1,31 @@
+<!-- Dans /var/ossec/etc/rules/packetfence_rules.xml -->
+
+<rule id="100203" level="6">
+  <decoded_as>packetfence</decoded_as>
+  <match>check=antivirus</match>
+  <description>PacketFence: Antivirus non conforme</description>
+</rule>
+
+<rule id="100204" level="6">
+  <decoded_as>packetfence</decoded_as>
+  <match>check=os_updates</match>
+  <description>PacketFence: OS non à jour</description>
+</rule>
+
+<rule id="100205" level="6">
+  <decoded_as>packetfence</decoded_as>
+  <match>check=local_firewall</match>
+  <description>PacketFence: Pare-feu désactivé</description>
+</rule>
+
+<rule id="100206" level="8">
+  <decoded_as>packetfence</decoded_as>
+  <match>check=os_version</match>
+  <description>PacketFence: Version OS non conforme</description>
+</rule>
+
+<rule id="100207" level="8">
+  <decoded_as>packetfence</decoded_as>
+  <match>check=security_agents</match>
+  <description>PacketFence: Agent de sécurité manquant</description>
+</rule>
