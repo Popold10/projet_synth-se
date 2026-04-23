@@ -1,0 +1,97 @@
+cat > /tmp/test_pf/test_antivirus.json << 'EOF'
+{
+  "rule": {
+    "id": "100203",
+    "level": 6,
+    "description": "PacketFence: Antivirus non conforme"
+  },
+  "data": {
+    "srcmac": "00:1A:2B:3C:4D:5E",
+    "srcip": "192.168.1.105",
+    "hostname": "DESKTOP-ABC123",
+    "srcuser": "johndoe",
+    "check": "antivirus",
+    "expected": "microsoft_defender_active",
+    "found": "microsoft_defender_disabled",
+    "status": "Reject",
+    "vlan": "5"
+  }
+}
+EOF
+
+
+cat > /tmp/test_pf/test_ad_auth.json << 'EOF'
+{
+  "rule": {
+    "id": "100201",
+    "level": 6,
+    "description": "PacketFence: Authentification AD invalide"
+  },
+  "data": {
+    "srcmac": "00:1A:2B:3C:4D:5E",
+    "srcip": "192.168.1.105",
+    "hostname": "DESKTOP-ABC123",
+    "srcuser": "johndoe",
+    "check": "ad_authentication",
+    "expected": "valid_ad_account",
+    "found": "invalid_credentials",
+    "status": "Reject",
+    "vlan": "3"
+  }
+}
+EOF
+
+
+cat > /tmp/test_pf/test_os_version.json << 'EOF'
+{
+  "rule": {
+    "id": "100206",
+    "level": 8,
+    "description": "PacketFence: Version OS non conforme"
+  },
+  "data": {
+    "srcmac": "00:1A:2B:3C:4D:5E",
+    "srcip": "192.168.1.105",
+    "hostname": "DESKTOP-OLD01",
+    "srcuser": "jdupont",
+    "check": "os_version",
+    "expected": "windows_10_minimum",
+    "found": "windows_7_build_7601",
+    "status": "Reject",
+    "vlan": "3"
+  }
+}
+EOF
+
+cat > /tmp/test_pf/test_security_agents.json << 'EOF'
+{
+  "rule": {
+    "id": "100207",
+    "level": 8,
+    "description": "PacketFence: Agent de sécurité manquant"
+  },
+  "data": {
+    "srcmac": "00:1A:2B:3C:4D:5E",
+    "srcip": "192.168.1.105",
+    "hostname": "DESKTOP-ABC123",
+    "srcuser": "johndoe",
+    "check": "security_agents",
+    "expected": "wazuh-agent,edr-agent",
+    "found": "none",
+    "status": "Reject",
+    "vlan": "5"
+  }
+}
+EOF
+
+# Tester un seul fichier
+python3 /var/ossec/integrations/llama_analysis.py /tmp/test_pf/test_antivirus.json
+
+# Tester tous les fichiers d'un coup
+for f in /tmp/test_pf/*.json; do
+  echo "=========================================="
+  echo "Test : $f"
+  echo "=========================================="
+  python3 /var/ossec/integrations/llama_analysis.py "$f"
+  echo ""
+done
