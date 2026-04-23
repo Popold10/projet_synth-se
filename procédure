@@ -1,0 +1,44 @@
+chmod 750 /var/ossec/integrations/llama_analysis.py
+chown root:wazuh /var/ossec/integrations/llama_analysis.py
+
+nano /var/ossec/etc/decoders/packetfence_decoders.xml
+
+<decoder name="packetfence">
+  <prematch>pfqueue</prematch>
+</decoder>
+
+<decoder name="packetfence_compliance">
+  <parent>packetfence</parent>
+  <regex>mac=(\S+) ip=(\S+) hostname=(\S+) user=(\S+) check=(\S+) expected=(\S+) found=(\S+) status=(\S+)</regex>
+  <order>srcmac, srcip, hostname, srcuser, check, expected, found, status</order>
+</decoder>
+
+
+nano /var/ossec/etc/ossec.conf
+
+<ossec_config>
+
+  <integration>
+    <name>llama</name>
+    <rule_id>100201,100202,100203,100204,100205,100206,100207</rule_id>
+    <script>/var/ossec/integrations/llama_analysis.py</script>
+    <alert_format>json</alert_format>
+  </integration>
+
+</ossec_config>
+
+
+systemctl restart wazuh-manager
+
+# Vérifier que le décodeur reconnaît bien les logs
+/var/ossec/bin/wazuh-logtest
+
+# Coller un log de test :
+# 2024-03-15 14:30:45 WARNING [pfqueue] Compliance check failed mac=00:1A:2B:3C:4D:5E ip=192.168.1.105 hostname=DESKTOP-ABC123 user=johndoe check=antivirus expected=microsoft_defender_active found=microsoft_defender_disabled status=Reject action=placed_in_remediation_vlan vlan=5
+
+
+# Vérifier les logs du manager
+tail -f /var/ossec/logs/ossec.log
+
+# Vérifier les analyses Llama
+tail -f /var/ossec/logs/llama_analysis.log
