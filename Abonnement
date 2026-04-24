@@ -1,0 +1,47 @@
+# Créer le fichier d'abonnement
+$subscription = @"
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+  <SubscriptionId>AD-Security-Events</SubscriptionId>
+  <SubscriptionType>SourceInitiated</SubscriptionType>
+  <Description>Collecte logs securite postes utilisateurs</Description>
+  <Enabled>true</Enabled>
+  <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+  <ConfigurationMode>Normal</ConfigurationMode>
+  <Delivery Mode="Push">
+    <Batching>
+      <MaxLatencyTime>900000</MaxLatencyTime>
+    </Batching>
+    <PushSettings>
+      <Heartbeat Interval="900000"/>
+    </PushSettings>
+  </Delivery>
+  <Query>
+    <![CDATA[
+      <QueryList>
+        <Query Id="0" Path="Security">
+          <Select Path="Security">
+            *[System[
+              (EventID=4625) or
+              (EventID=4624) or
+              (EventID=4740) or
+              (EventID=4648)
+            ]]>
+          </Select>
+        </Query>
+      </QueryList>
+    ]]>
+  </Query>
+  <ReadExistingEvents>false</ReadExistingEvents>
+  <TransportName>http</TransportName>
+  <ContentFormat>RenderedText</ContentFormat>
+  <Locale Language="fr-FR"/>
+  <LogFile>ForwardedEvents</LogFile>
+  <AllowedSourceDomainComputers>O:NSG:NSD:(A;;GA;;;DC)</AllowedSourceDomainComputers>
+</Subscription>
+"@
+
+$subscription | Out-File "C:\wec-subscription.xml" -Encoding UTF8
+wecutil cs "C:\wec-subscription.xml"
+
+# Vérifier
+wecutil es
