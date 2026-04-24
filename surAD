@@ -1,0 +1,49 @@
+
+C:\Program Files (x86)\ossec-agent\ossec.conf
+
+
+<!-- Logs de sécurité Windows (source principale AD) -->
+  <localfile>
+    <location>Security</location>
+    <log_format>eventchannel</log_format>
+    <query>
+      <![CDATA[
+        <QueryList>
+          <Query Id="0" Path="Security">
+            <Select Path="Security">
+              *[System[
+                (EventID=4625) or  <!-- Échec de connexion -->
+                (EventID=4624) or  <!-- Connexion réussie -->
+                (EventID=4740) or  <!-- Compte verrouillé -->
+                (EventID=4767) or  <!-- Compte déverrouillé -->
+                (EventID=4648) or  <!-- Connexion avec credentials explicites -->
+                (EventID=4768) or  <!-- Ticket Kerberos demandé (TGT) -->
+                (EventID=4771) or  <!-- Échec Kerberos pre-auth -->
+                (EventID=4776) or  <!-- Validation credentials NTLM -->
+                (EventID=4720) or  <!-- Compte créé -->
+                (EventID=4726) or  <!-- Compte supprimé -->
+                (EventID=4722) or  <!-- Compte activé -->
+                (EventID=4725) or  <!-- Compte désactivé -->
+                (EventID=4723) or  <!-- Tentative changement mot de passe -->
+                (EventID=4724) or  <!-- Réinitialisation mot de passe -->
+                (EventID=4756) or  <!-- Membre ajouté groupe sécurité -->
+                (EventID=4757)     <!-- Membre retiré groupe sécurité -->
+              ]]>
+            </Select>
+          </Query>
+        </QueryList>
+      ]]>
+    </query>
+  </localfile>
+
+  <!-- Logs Système -->
+  <localfile>
+    <location>System</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+
+  <!-- Logs Application -->
+  <localfile>
+    <location>Application</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
