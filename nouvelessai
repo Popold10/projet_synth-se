@@ -1,0 +1,44 @@
+$file = "C:\Program Files (x86)\ossec-agent\ossec.conf"
+$content = Get-Content $file -Raw
+
+$securityBlock = @"
+
+  <localfile>
+    <location>Security</location>
+    <log_format>eventchannel</log_format>
+    <query>
+      <![CDATA[
+        <QueryList>
+          <Query Id="0" Path="Security">
+            <Select Path="Security">
+              *[System[
+                (EventID=4625) or
+                (EventID=4624) or
+                (EventID=4740) or
+                (EventID=4767) or
+                (EventID=4648) or
+                (EventID=4768) or
+                (EventID=4771) or
+                (EventID=4776) or
+                (EventID=4720) or
+                (EventID=4726) or
+                (EventID=4722) or
+                (EventID=4725) or
+                (EventID=4723) or
+                (EventID=4724) or
+                (EventID=4756) or
+                (EventID=4757)
+              ]]>
+            </Select>
+          </Query>
+        </QueryList>
+      ]]>
+    </query>
+  </localfile>
+
+"@
+
+# Insérer juste avant </ossec_config>
+$content = $content -replace '</ossec_config>', "$securityBlock`n</ossec_config>"
+
+[System.IO.File]::WriteAllText($file, $content, [System.Text.ASCIIEncoding]::new())
