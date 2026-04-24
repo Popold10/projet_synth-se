@@ -1,0 +1,12 @@
+$file = "C:\Program Files (x86)\ossec-agent\ossec.conf"
+
+$content = Get-Content $file -Raw
+
+# Supprimer tous les commentaires XML (bien formés ou non)
+$content = $content -replace '(?s)<(!-+.*?-+>|!--.*?-->)', ''
+
+# Réécrire en UTF-8 sans BOM
+[System.IO.File]::WriteAllText($file, $content.TrimStart(), [System.Text.UTF8Encoding]::new($false))
+
+# Vérifier le résultat
+Get-Content $file -TotalCount 5
