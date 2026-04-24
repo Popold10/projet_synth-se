@@ -1,0 +1,8 @@
+$file = "C:\Program Files (x86)\ossec-agent\ossec.conf"
+
+$content = Get-Content $file -Raw
+
+# Supprimer uniquement les blocs <query>...</query> (qui contiennent le CDATA)
+$content = $content -replace '(?s)<query>.*?</query>', ''
+
+[System.IO.File]::WriteAllText($file, $content, [System.Text.ASCIIEncoding]::new())
