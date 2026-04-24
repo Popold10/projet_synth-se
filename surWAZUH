@@ -1,0 +1,60 @@
+ /var/ossec/etc/rules/active_directory_rules.xml
+
+
+<group name="windows,active_directory,authentication,">
+
+  <!-- Compte verrouillé -->
+  <rule id="100200" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4740$</field>
+    <description>AD: Compte utilisateur verrouillé - $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <group>account_lockout,pci_dss_8.1.6,gdpr_IV_35.7.d,</group>
+  </rule>
+
+  <!-- Multiples échecs de connexion (brute force) -->
+  <rule id="100201" level="14" frequency="5" timeframe="120">
+    <if_matched_sid>60122</if_matched_sid>
+    <same_field>win.eventdata.targetUserName</same_field>
+    <description>AD: Brute-force détecté - 5 échecs sur $(win.eventdata.targetUserName) en 2 min</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>brute_force,pci_dss_11.4,</group>
+  </rule>
+
+  <!-- Connexion en dehors des heures ouvrables -->
+  <rule id="100202" level="8">
+    <if_sid>60106</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <time>18:00 - 07:00</time>
+    <description>AD: Connexion hors heures ouvrables - $(win.eventdata.targetUserName)</description>
+    <group>policy_violation,</group>
+  </rule>
+
+  <!-- Échec Kerberos - pré-authentification -->
+  <rule id="100203" level="10">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4771$</field>
+    <description>AD: Échec authentification Kerberos - $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1558</id>
+    </mitre>
+    <group>kerberos,authentication_failed,</group>
+  </rule>
+
+  <!-- Ajout à un groupe privilégié -->
+  <rule id="100204" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4756$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">(?i)(domain admins|enterprise admins|schema admins|administrators)</field>
+    <description>AD: Ajout dans un groupe privilégié - $(win.eventdata.memberName)</description>
+    <mitre>
+      <id>T1078.002</id>
+    </mitre>
+    <group>privilege_escalation,</group>
+  </rule>
+
+</group>
