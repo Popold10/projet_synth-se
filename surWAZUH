@@ -57,4 +57,17 @@
     <group>privilege_escalation,</group>
   </rule>
 
+
+ <!-- Brute-force réparti sur plusieurs DC -->
+ <rule id="100205" level="15" frequency="6" timeframe="180">
+   <if_matched_sid>60122</if_matched_sid>
+   <same_field>win.eventdata.targetUserName</same_field>
+   <different_field>agent.name</different_field>
+   <description>AD: Brute-force multi-DC détecté sur le compte $(win.eventdata.targetUserName)</description>
+   <mitre>
+     <id>T1110.001</id>
+   </mitre>
+   <group>brute_force,multi_dc,</group>
+ </rule>
+
 </group>
