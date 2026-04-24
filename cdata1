@@ -1,0 +1,11 @@
+$file = "C:\Program Files (x86)\ossec-agent\ossec.conf"
+$content = Get-Content $file -Raw
+
+# Supprimer les résidus CDATA et balises query orphelines
+$content = $content -replace '(?s)\s*</QueryList>\s*\]\]>\s*</query>', ''
+$content = $content -replace '(?s)<query>\s*</query>', ''
+
+[System.IO.File]::WriteAllText($file, $content, [System.Text.ASCIIEncoding]::new())
+
+# Vérifier
+Get-Content $file -TotalCount 20
