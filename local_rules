@@ -1,0 +1,11 @@
+<group name="windows,authentication,local,">
+
+  <rule id="100010" level="3">
+    <if_sid>60000</if_sid>
+    <field name="win.system.eventID">^4768$</field>
+    <options>no_full_log</options>
+    <description>Kerberos TGT accordé (connexion domaine réussie) - utilisateur: $(win.eventdata.targetUserName)</description>
+    <group>authentication_success,</group>
+  </rule>
+
+</group>
