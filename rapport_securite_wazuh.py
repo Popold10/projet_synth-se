@@ -155,16 +155,20 @@ Legende des codes d'echec : 0x18 = mauvais mot de passe, 0x12 = compte desactive
 0x6 = utilisateur inconnu, 0x25 = decalage d'horloge (probleme technique, PAS une attaque), \
 0x17 = mot de passe expire.
 
+REGLES STRICTES (a respecter imperativement) :
+- N'affirme RIEN qui ne soit pas explicitement dans les donnees. N'invente aucun chiffre, aucun utilisateur, aucune IP.
+- Compte le nombre d'utilisateurs distincts et d'IP distinctes dans la liste des echecs, et raisonne dessus :
+  * BRUTE-FORCE = plusieurs echecs concentres sur UN SEUL compte.
+  * PASSWORD SPRAY = plusieurs comptes DISTINCTS vises (3 utilisateurs differents ou plus), souvent depuis une meme IP.
+  * S'il n'y a qu'UN SEUL utilisateur dans la liste des echecs, c'est du BRUTE-FORCE, jamais du password spray. \
+N'ecris JAMAIS "differents comptes" ou "plusieurs comptes" dans ce cas.
+- Si une categorie est vide, dis-le simplement (ex: "aucune tentative suspecte detectee").
+
 Structure le rapport ainsi :
-1. Resume en une ou deux phrases.
-2. Tentatives suspectes / signaux d'attaque : brute-force = beaucoup d'echecs sur un meme compte ; \
-password spray = une IP qui teste beaucoup de comptes, ou un compte teste depuis beaucoup d'IP ; \
-comptes verrouilles. Cite les utilisateurs et IP concernes.
+1. Resume en une ou deux phrases, en precisant le nombre d'echecs et le nombre d'utilisateurs/IP distincts concernes.
+2. Tentatives suspectes / signaux d'attaque : qualifie correctement (brute-force vs password spray selon les regles ci-dessus), cite les utilisateurs et IP exacts.
 3. Problemes de connexion benins (mots de passe expires, decalage d'horloge, comptes desactives).
 4. Recommandations concretes.
-
-Regles : base-toi UNIQUEMENT sur les donnees fournies, n'invente aucun chiffre, et si une \
-categorie est vide, dis-le simplement.
 
 SYNTHESE :
 {summary}
