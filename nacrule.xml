@@ -1,0 +1,22 @@
+<group name="nac,compliance,">
+
+  <rule id="100400" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="log_type">nac</field>
+    <description>NAC: etat de conformite recu - $(Machine)</description>
+  </rule>
+
+  <rule id="100401" level="8">
+    <if_sid>100400</if_sid>
+    <field name="Status">NONCONFORME</field>
+    <description>NAC: machine NON CONFORME - $(Machine)</description>
+    <group>policy_violation,</group>
+  </rule>
+
+  <rule id="100402" level="6">
+    <if_sid>100400</if_sid>
+    <field name="Firewall">False</field>
+    <description>NAC: pare-feu desactive - $(Machine)</description>
+  </rule>
+
+</group>
