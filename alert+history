@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""
+Alerte brute-force Wazuh + Ollama (cron) -- envoi via Brevo (HTTPS)
+-------------------------------------------------------------------
+Compte les echecs d'authentification par utilisateur et par IP sur une
+fenetre de temps (comptes machine exclus). Si un compte OU une IP depasse
+un seuil d'echecs, envoie un mail : analyse IA + evenements bruts.
+Sinon, aucun mail.
+
+Detection par AGREGATION (comme le rapport web), et non par la regle 100201 :
+cela capte aussi les brute-force LENTES que la correlation 5-en-2-min rate.
+"""
+
+import os
+import json
+from datetime import datetime, timedelta, timezone
+
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# ===== CONFIGURATION (reporte tes valeurs depuis l'ancien script) =====
+OPENSEARCH_URL  = "https://192.168.2.50:9200"
+OPENSEARCH_USER = "admin"
+OPENSEARCH_PASS = "TON_MDP"
+INDEX           = "wazuh-alerts-*"
+VERIFY_SSL      = False
+TIME_FIELD      = "timestamp"
+
+LOOKBACK_HOURS    = 24    # fenetre d'analyse ; doit correspondre a la frequence du cron
+FAILURE_THRESHOLD = 5     # alerte si un compte OU une IP atteint ce nb d'echecs
+FAIL_EVENT_IDS    = ["4625", "4771", "4776"]
+MAX_EVENTS        = 50
+
+HISTORY_FILE = "/opt/rapport-wazuh/historique_alertes.jsonl"  # memoire des alertes
+HISTORY_DAYS = 7                                              # roulement (1 semaine)
+
+OLLAMA_URL   = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "llama3:8b"
+
+BREVO_API_KEY = "xkeysib-TA_CLE"
+SENDER_EMAIL  = "alertes@dietagro.com"     # expediteur verifie dans Brevo
+SENDER_NAME   = "Wazuh Alerting"
+TO_EMAIL      = "soc@dietagro.com"
+TO_NAME       = "SOC"
+# ======================================================================
+
+CODES = {"0x18": "mauvais mot de passe", "0x12": "compte desactive/verrouille",
+         "0x6": "utilisateur inconnu", "0x25": "decalage d'horloge",
+         "0x17": "mot de passe expire"}
+
+
+def fetch_failures():
+    query = {
+        "size": MAX_EVENTS,
+        "sort": [{TIME_FIELD: {"order": "desc"}}],
+        "query": {
+            "bool": {
+                "filter": [
+                    {"range": {TIME_FIELD: {"gte": f"now-{LOOKBACK_HOURS}h"}}},
+                    {"terms": {"data.win.system.eventID": FAIL_EVENT_IDS}},
+                ]
+            }
+        },
+        "aggs": {
+            "par_user": {"terms": {"field": "data.win.eventdata.targetUserName", "size": 30}},
+            "par_ip":   {"terms": {"field": "data.win.eventdata.ipAddress", "size": 30}},
+            "par_code": {"terms": {"field": "data.win.eventdata.status", "size": 15}},
+        },
+    }
+    r = requests.get(f"{OPENSEARCH_URL}/{INDEX}/_search", json=query,
+                     auth=(OPENSEARCH_USER, OPENSEARCH_PASS),
+                     verify=VERIFY_SSL, timeout=30)
+    if not r.ok:
+        print("REPONSE INDEXEUR:", r.text)
+    r.raise_for_status()
+    return r.json()
+
+
+def buckets(resp, name):
+    return resp.get("aggregations", {}).get(name, {}).get("buckets", [])
+
+
+def user_buckets(resp):
+    # exclut les comptes machine (se terminent par $) cote Python -> pas de wildcard
+    return [b for b in buckets(resp, "par_user") if not str(b["key"]).endswith("$")]
+
+
+def detect(resp):
+    """Comptes et IP qui depassent le seuil d'echecs."""
+    off_users = [b for b in user_buckets(resp) if b["doc_count"] >= FAILURE_THRESHOLD]
+    off_ips   = [b for b in buckets(resp, "par_ip") if b["doc_count"] >= FAILURE_THRESHOLD]
+    return off_users, off_ips
+
+
+def build_summary(resp):
+    out = [f"Echecs d'authentification sur les {LOOKBACK_HOURS} dernieres heures "
+           f"(comptes machine exclus) :", ""]
+    out.append("Par utilisateur :")
+    out += [f"  - {b['key']} : {b['doc_count']} echecs" for b in user_buckets(resp)] or ["  (aucun)"]
+    out.append("\nPar IP source :")
+    out += [f"  - {b['key']} : {b['doc_count']} echecs" for b in buckets(resp, "par_ip")] or ["  (aucune)"]
+    out.append("\nCodes d'erreur :")
+    out += [f"  - {b['key']} ({CODES.get(b['key'], '?')}) : {b['doc_count']}"
+            for b in buckets(resp, "par_code")] or ["  (aucun)"]
+    return "\n".join(out)
+
+
+def build_raw_list(resp):
+    lines = []
+    for hit in resp.get("hits", {}).get("hits", []):
+        s = hit.get("_source", {})
+        win = s.get("data", {}).get("win", {})
+        d = win.get("eventdata", {})
+        sysd = win.get("system", {})
+        user = d.get("targetUserName", "?")
+        if str(user).endswith("$"):
+            continue  # ignore comptes machine
+        lines.append(f"{s.get('timestamp', '?')} | event {sysd.get('eventID', '?')} | "
+                     f"user {user} | ip {d.get('ipAddress', '?')} | "
+                     f"regle {s.get('rule', {}).get('id', '?')}")
+    return lines
+
+
+def load_history():
+    """Charge l'historique en ne gardant que les HISTORY_DAYS derniers jours (roulement)."""
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=HISTORY_DAYS)
+    out = []
+    with open(HISTORY_FILE, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                e = json.loads(line)
+                if datetime.fromisoformat(e["ts"]) >= cutoff:
+                    out.append(e)
+            except Exception:
+                continue
+    return out
+
+
+def save_history(entries):
+    os.makedirs(os.path.dirname(HISTORY_FILE) or ".", exist_ok=True)
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        for e in entries:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+
+
+def build_history_summary(history):
+    """Resume deterministe des alertes precedentes, injecte dans le prompt."""
+    if not history:
+        return "(aucune alerte enregistree sur les 7 derniers jours)"
+    lines = []
+    for e in history:
+        u = ", ".join(f"{x['key']}({x['count']})" for x in e.get("users", [])) or "-"
+        i = ", ".join(f"{x['key']}({x['count']})" for x in e.get("ips", [])) or "-"
+        date = e.get("ts", "?")[:16].replace("T", " ")
+        lines.append(f"- {date} | comptes: {u} | IP: {i}")
+    return "\n".join(lines)
+
+
+PROMPT = """Tu es analyste SOC. Voici une synthese d'echecs d'authentification au domaine \
+ayant declenche une suspicion de brute-force (un compte ou une IP a depasse le seuil d'echecs). \
+Tu disposes aussi de l'HISTORIQUE des alertes des 7 derniers jours : sers-t'en pour reperer les \
+RECURRENCES (meme compte ou meme IP deja signale) et faire des liens entre les incidents.
+Redige une courte analyse en francais :
+1. Resume de l'incident actuel (compte(s) et IP concernes, nombre d'echecs).
+2. Qualification : brute-force si les echecs visent UN SEUL compte ; password spray si plusieurs \
+comptes distincts depuis une meme IP.
+3. Mise en perspective : cet incident est-il une recurrence (deja vu dans l'historique) ? Y a-t-il \
+un lien avec une alerte precedente (meme IP, meme compte) ? Si rien dans l'historique ne correspond, \
+dis-le.
+4. Recommandations concretes.
+Base-toi UNIQUEMENT sur les donnees fournies, n'invente aucun chiffre.
+
+HISTORIQUE DES ALERTES PRECEDENTES (7 derniers jours) :
+{history}
+
+SYNTHESE DE L'INCIDENT ACTUEL :
+{summary}
+"""
+
+
+def ask_ollama(summary, history_summary):
+    try:
+        r = requests.post(OLLAMA_URL,
+                          json={"model": OLLAMA_MODEL,
+                                "prompt": PROMPT.format(summary=summary, history=history_summary),
+                                "stream": False},
+                          timeout=300)
+        r.raise_for_status()
+        return r.json().get("response", "(pas de reponse du modele)")
+    except Exception as e:
+        return f"(analyse IA indisponible : {e})"
+
+
+def send_email(subject, body):
+    payload = {"sender": {"name": SENDER_NAME, "email": SENDER_EMAIL},
+               "to": [{"email": TO_EMAIL, "name": TO_NAME}],
+               "subject": subject, "textContent": body}
+    headers = {"api-key": BREVO_API_KEY,
+               "Content-Type": "application/json", "Accept": "application/json"}
+    r = requests.post("https://api.brevo.com/v3/smtp/email",
+                      json=payload, headers=headers, timeout=30)
+    if not r.ok:
+        print("REPONSE BREVO:", r.status_code, r.text)
+    r.raise_for_status()
+
+
+def main():
+    history = load_history()          # deja elague aux 7 derniers jours
+    resp = fetch_failures()
+    off_users, off_ips = detect(resp)
+    if not off_users and not off_ips:
+        save_history(history)         # applique le roulement meme sans nouvelle alerte
+        return                        # pas de brute-force -> pas de mail
+
+    summary = build_summary(resp)
+    raw = build_raw_list(resp)
+    analysis = ask_ollama(summary, build_history_summary(history))
+
+    cibles = ", ".join(b["key"] for b in off_users) or \
+             ", ".join(b["key"] for b in off_ips) or "-"
+    body = ("=== ANALYSE (IA) ===\n\n" + analysis +
+            "\n\n=== ECHECS BRUTS (comptes machine exclus) ===\n\n" + "\n".join(raw))
+    subject = f"[Wazuh] Suspicion de brute-force - {cibles}"
+    send_email(subject, body)
+
+    # enregistre l'alerte dans l'historique (pour les analyses futures)
+    history.append({
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "users": [{"key": b["key"], "count": b["doc_count"]} for b in off_users],
+        "ips":   [{"key": b["key"], "count": b["doc_count"]} for b in off_ips],
+    })
+    save_history(history)
+    print(subject, "-> mail envoye et enregistre")
+
+
+if __name__ == "__main__":
+    main()
