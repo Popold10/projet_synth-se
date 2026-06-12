@@ -1,0 +1,33 @@
+<!--
+  /var/ossec/etc/decoders/packetfence_decoders.xml  (sur le MANAGER Wazuh)
+
+  Deux jeux de decodeurs, tous nommes "packetfence" => tous satisfont
+  <decoded_as>packetfence</decoded_as> dans tes regles 100303-100307.
+
+  (1) NATIF  : matche les vraies lignes PacketFence conteneurisees
+               (*-docker-wrapper). Fait fonctionner la chaine MAINTENANT.
+  (2) STRUCTURE : ton decodeur d'origine, conserve pour l'option "script"
+               (PacketFence ecrit une ligne 'Compliance check failed mac=... check=...').
+-->
+
+<!-- ============ (1) Format natif PacketFence (conteneurise) ============ -->
+<decoder name="packetfence">
+  <program_name>docker-wrapper$</program_name>
+</decoder>
+
+<decoder name="packetfence">
+  <parent>packetfence</parent>
+  <regex>mac:(\w+:\w+:\w+:\w+:\w+:\w+)</regex>
+  <order>srcmac</order>
+</decoder>
+
+<!-- ============ (2) Format structure (ton decodeur d'origine) ============ -->
+<decoder name="packetfence">
+  <prematch>WARNING [pfqueue] Compliance check failed</prematch>
+</decoder>
+
+<decoder name="packetfence_compliance">
+  <parent>packetfence</parent>
+  <regex>mac=(\S+) ip=(\S+) hostname=(\S+) user=(\S+) check=(\S+) expected=(\S+) found=(\S+) status=(\S+)</regex>
+  <order>srcmac, srcip, hostname, srcuser, check, expected, found, status</order>
+</decoder>
