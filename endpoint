@@ -1,0 +1,34 @@
+<group name="windows,endpoint_security,">
+
+  <!-- Malware / logiciel indesirable (EventID 1116) -->
+  <rule id="100601" level="12">
+    <if_sid>62123</if_sid>
+    <description>Defender: MALWARE detecte sur $(win.system.computer)</description>
+    <group>pci_dss_11.4,</group>
+  </rule>
+
+  <!-- Protection temps reel desactivee (EventID 5001) -->
+  <rule id="100602" level="12">
+    <if_sid>62152</if_sid>
+    <description>Defender: protection temps reel DESACTIVEE sur $(win.system.computer)</description>
+  </rule>
+
+  <!-- Analyse antivirus desactivee (EventID 5010 / 5012) -->
+  <rule id="100603" level="10">
+    <if_sid>62157,62159</if_sid>
+    <description>Defender: analyse antivirus DESACTIVEE sur $(win.system.computer)</description>
+  </rule>
+
+  <!-- Echec mise a jour des signatures (EventID 2001) -->
+  <rule id="100604" level="6">
+    <if_sid>62131</if_sid>
+    <description>Defender: echec MAJ signatures sur $(win.system.computer)</description>
+  </rule>
+
+  <!-- Pare-feu Windows desactive (EventID 2003, profil -> No) -->
+  <rule id="100611" level="12">
+    <if_sid>67005</if_sid>
+    <description>Pare-feu: Windows Defender Firewall DESACTIVE sur $(win.system.computer)</description>
+  </rule>
+
+</group>
